@@ -16,7 +16,7 @@
  */
 (function (module, global) {
 var theWsProtocol = "wip";
-var theWsUrl = "wss://bb8-wsgw-dev.dev.opsnow.com";
+var theWsUrl = "wss://127.0.0.1";
 var theWipVersion = "0.1";
 var theTimeout = [3000, 60000];
 var theAudioDvc;
