@@ -1,0 +1,253 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <meta http-equiv="cache-control" content="no-cache">
+    <meta http-equiv="pragma" content="no-cache">
+    <meta http-equiv="expires" content="0">
+    <script src="/webjars/webrtc-adapter/release/adapter.js"></script>
+    <script src="js/kurento-utils.js"></script>
+    <script src="webip.js"></script>
+    <title>HelpNow WebRTC</title>
+</head>
+
+<body onunload="unload()">
+  <header>
+    <h2></h2>
+  </header>
+  <section class="sample">
+    <form>
+      <div>
+        <h4>WebRTC HelpNow AI Demo sample</h4>
+        <button type="button" id="btn_make_call" onclick="gMakeCall()">전화 걸기</button>
+        <button type="button" id="btn_clear_call" onclick="gClearCall()">전화 끊기</button>
+        <br/><br/>
+      </div>
+      <div>
+        <h4>내 전화번호</h4>
+        <input type="text" name="input_ani" id="input_ani" placeholder="발신 번호">
+        <br/><br/>
+      </div>
+      <div>
+        <audio id="audio" autoplay></audio>
+      </div>
+    </form>
+  </section>
+<script>
+  var theDnis = "test10111015";
+  var theAudio;
+  var theWipDlgId = 0;
+  const theWipDlgMp = new Map();
+
+  window.onload = function()
+  {
+    // Audio device 활성화
+    theAudio = document.querySelector('audio');
+  }
+
+  window.onbeforeunload = function()
+  {
+    theWipDlgMp.forEach(v => v.WsClose());
+    theWipDlgMp = null;
+  }
+
+  /*
+   * @brief              WIP 다이얼로그 생성
+   * @return             생성한 WIP 다이얼로그 객체
+   * @param  strAni      발신번호, 내 전화번호 또는 구분자
+   * @param  strDnis     착신번호, 상대방 전화번호로 HelpNow 채널 연동시 발급 받은 번호
+   * @param  oAudio      오디오 디바이스 객체
+  */
+  function gMakeWipDlg(strAni, strDnis, oAudio)
+  {
+    var id = theWipDlgId++;
+    var iWipDlg = new webip.MWipDialog(id, strAni, strDnis, oAudio);
+    theWipDlgMp.set(id, iWipDlg);
+    console.log("Make WIP Dialog [id=" + id + ", current count=" + theWipDlgMp.size + "]");
+    return iWipDlg;
+  }
+
+  /*
+   * @brief              WIP 다이얼로그 제거
+   * @param  id          MWipDialog의 ID, MWipDialog 생성시 첫번째 입력 파라메터
+  */
+  function gRemoveWipDlg(id)
+  {
+    theWipDlgMp.delete(id);
+    console.log("Remove WIP Dialog [id=" + id + ", current count=" + theWipDlgMp.size + "]");
+  }
+
+  /*
+   * @brief              WIP 다이얼로그 조회
+   * @return             조회한 WIP 다이얼로그 객체
+   * @param  id          MWipDialog의 ID, MWipDialog 생성시 첫번째 입력 파라메터
+  */
+  function gGetWipDlg(id)
+  {
+    return theWipDlgMp.get(id);
+  }
+
+  /*
+   * @brief              예기치 않게 웹소켓이 끊어진 경우 이벤트 콜백
+   * @return             true: 재연결 시도, false: 세션 종료
+   * @param  id          MWipDialog의 ID, MWipDialog 생성시 첫번째 입력 파라메터
+   * @param  retry       재연결 시도 횟수
+  */
+  function gCbUnforeseenWebSocketDisconnect(id, retry)
+  {
+    console.log("gCbUnforeseenWebSocketDisconnect : " + id + ", retry=" + retry);
+    if(retry < 5)
+      return true; // 재연결 시도
+    return false; // 세션 종료
+  }
+
+  /*
+   * @brief              웹소켓 연결 초기화 이벤트 콜백
+   * @return             true: 성공, false: 실패
+   * @param  id          MWipDialog의 ID, MWipDialog 생성시 첫번째 입력 파라메터
+   * @param  retry       재연결로 인한 초기화 시도 횟수
+  */
+  function gCbInitializedWebSocket(id, retry)
+  {
+    console.log("gCbInitializedWebSocket : " + id + ", retry=" + retry);
+    if(retry == 0)
+    {
+      var iWipDlg = webip.GetWipDlg(id);
+      if(!iWipDlg.WipMakeCall())  // 웹소켓 연결 후 바로 발신
+      {
+        iWipDlg.WsClose();
+        return false;
+      }
+    }
+    return true;
+  }
+
+  /*
+   * @brief              웹소켓 해제 이벤트 콜백
+   * @param  id          MWipDialog의 ID, MWipDialog 생성시 첫번째 입력 파라메터
+  */
+  function gCbReleasedWebSocket(id)
+  {
+    console.log("gCbReleasedWebSocket : " + id);
+    gRemoveWipDlg(id);
+  }
+
+  /*
+   * @brief              통화 연결 이벤트 콜백
+   * @param  id          MWipDialog의 ID, MWipDialog 생성시 첫번째 입력 파라메터
+  */
+  function gCbEstablishedCall(id)
+  {
+    console.log("gCbEstablishedCall : " + id);
+  }
+
+  /*
+   * @brief              통화 종료 이벤트 콜백
+   * @param  id          MWipDialog의 ID, MWipDialog 생성시 첫번째 입력 파라메터
+  */
+  function gCbTerminatedCall(id)
+  {
+    console.log("gCbTerminatedCall : " + id);
+  }
+
+  /*
+   * @brief              통화 다이얼로그 해제 이벤트 콜백
+   * @param  id          MWipDialog의 ID, MWipDialog 생성시 첫번째 입력 파라메터
+  */
+  function gCbReleasedCall(id)
+  {
+    console.log("gCbReleasedCall : " + id);
+    var iWipDlg = webip.GetWipDlg(id);
+    iWipDlg.WsClose(); // 통화가 완전히 종료되면 웹소켓 close
+  }
+
+  /*
+   * @brief              WebRTC-Peer 생성 이벤트 콜백
+   * @return             true: 성공, false: 실패
+   * @param  id          MWipDialog의 ID, MWipDialog 생성시 첫번째 입력 파라메터
+   * @param  error       생성 실패시 오류 정보
+   * @note               MWipDialog의 onCreateWebRTCPeer 함수를 호출해줘야 offer SDP를 생성 시도함. offer SDP가 생성되지 않는 경우 호를 발신하지 않음.
+  */
+  function gCbCreateWebRTCPeer(id, error)
+  {
+    console.log("gCbCreateWebRTCPeer : " + id);
+    var iWipDlg = webip.GetWipDlg(id);
+    return iWipDlg.onCreateWebRTCPeer(error);
+  }
+
+  /*
+   * @brief              Offer SDP 생성 이벤트 콜백
+   * @return             true: 성공, false: 실패
+   * @param  id          MWipDialog의 ID, MWipDialog 생성시 첫번째 입력 파라메터
+   * @param  strError    생성 실패시 오류 문자열
+   * @param  strSdp      생성된 SDP 문자열
+   * @note               MWipDialog의 onOfferCall 함수를 호출해줘야 호를 발신시도 함.
+  */
+  function gCbOfferCall(id, strError, strSdp)
+  {
+    console.log("gCbOfferCall : " + id);
+    var iWipDlg = webip.GetWipDlg(id);
+    return iWipDlg.onOfferCall(strError, strSdp);
+  }
+
+  /*
+   * @brief              ICE Candidate 수집 이벤트 콜백
+   * @return             true: 성공, false: 실패
+   * @param  id          MWipDialog의 ID, MWipDialog 생성시 첫번째 입력 파라메터
+   * @param  jCandidate  수집된 candidate 정보
+   * @note               MWipDialog의 onIceCandidate 함수를 호출해줘야 상대방 단말에 전달함.
+  */
+  function gCbIceCandidate(id, jCandidate)
+  {
+    console.log("gCbIceCandidate : " + id);
+    var iWipDlg = webip.GetWipDlg(id);
+    return iWipDlg.onIceCandidate(jCandidate);
+  }
+
+  function gMakeCall(jMsg)
+  {
+    console.log("gMakeCall");
+    var strAni = document.getElementById('input_ani').value;
+    if(strAni == '')
+    {
+      window.alert('발신 번호를 입력하세요.');
+      return;
+    }
+    var iWipDlg = webip.MakeWipDlg(strAni, theDnis, theAudio);
+    if(!iWipDlg)
+    {
+      window.alert('전화 연결 실패\nDialog 생성 실패');
+      return false;
+    }
+    iWipDlg.WsConnect();
+    return true;
+  }
+
+  function gClearCall()
+  {
+    console.log("gClearCall");
+    var iWipDlg = webip.GetWipDlg(theWipDlgId-1);
+    if(!iWipDlg.WipClearCall())
+      iWipDlg.WsClose();
+  }
+
+  // 재정의한 함수를 webip module scope에 연결 
+  webip.MakeWipDlg = gMakeWipDlg;
+  webip.RemoveWipDlg = gRemoveWipDlg;
+  webip.GetWipDlg = gGetWipDlg;
+  webip.CbUnforeseenWebSocketDisconnect = gCbUnforeseenWebSocketDisconnect;
+  webip.CbInitializedWebSocket = gCbInitializedWebSocket;
+  webip.CbReleasedWebSocket = gCbReleasedWebSocket;
+  webip.CbEstablishedCall = gCbEstablishedCall;
+  webip.CbTerminatedCall = gCbTerminatedCall;
+  webip.CbReleasedCall = gCbReleasedCall;
+  webip.CbCreateWebRTCPeer = gCbCreateWebRTCPeer;
+  webip.CbOfferCall = gCbOfferCall;
+  webip.CbIceCandidate = gCbIceCandidate;
+
+</script>
+
+</body>
+
+</html>
