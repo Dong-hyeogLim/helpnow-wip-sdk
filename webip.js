@@ -16,7 +16,6 @@
  */
 (function (module, global) {
 var theWsProtocol = "wip";
-var theWsUrl = "wss://127.0.0.1";
 var theWipVersion = "0.1";
 var theTimeout = [3000, 60000];
 var theAudioDvc;
@@ -151,7 +150,7 @@ class MWsNone extends MWsStateMc
   ConnectSession(iDlg)
   {
     console.log("[INFO] MWsNone::ConnectSession");
-    iDlg.miWs = new WebSocket(theWsUrl, theWsProtocol);
+    iDlg.miWs = new WebSocket(iDlg.mstrWsUrl, theWsProtocol);
     if(!iDlg.miWs)
     {
       console.log("[ERROR] Create webSocket instance failed!!");
@@ -351,7 +350,7 @@ class MWsReconnecting extends MWsStateMc
   {
     console.log("[INFO] MWsReconnecting::ReconnectSession");
     iDlg.mnRetryCnt++;
-    iDlg.miWs = new WebSocket(theWsUrl, theWsProtocol);
+    iDlg.miWs = new WebSocket(iDlg.mstrWsUrl, theWsProtocol);
     if(iDlg.miWs == null)
     {
       console.log("[WARNING] Create webSocket instance failed!! [try=" + iDlg.mnWsToCnt+1 + "]");
@@ -875,11 +874,12 @@ var theWipTerm = new MWipUastTerminated();
 // WIP Dialog Implement
 class MWipDialog
 {
-  constructor(nIdx, strAni, strDnis, oAudioDvc)
+  constructor(nIdx, strAni, strDnis, strWsUrl, oAudioDvc)
   {
     this.mnIdx = nIdx;
     this.mstrAni = strAni;
     this.mstrDnis = strDnis;
+    this.mstrWsUrl = strWsUrl;
     this.miWsStMc = theWsNone;
     this.miWipStMc = theWipNone;
     this.miWs = null;
@@ -1297,12 +1297,12 @@ class MWipDialog
 
 /*
  * Multi-call 기능을 필요로 할경우 아래 함수를 사용자가 직접 재정의 하여 사용한다.
- * 재정의 방법은 sample.html 파일을 참고한다.
+ * 재정의 방법은 index.html 파일을 참고한다.
 */
 var iWipDlg = null;
-module.MakeWipDlg = function(strAni, strDnis, oAudio)
+module.MakeWipDlg = function(strAni, strDnis, strWsUrl, oAudio)
 {
-  iWipDlg = new MWipDialog(0, strAni, strDnis, oAudio);
+  iWipDlg = new MWipDialog(0, strAni, strDnis, strWsUrl, oAudio);
   console.log("Make WIP Dialog!!");
   return iWipDlg;
 }

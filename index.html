@@ -36,7 +36,8 @@
     </form>
   </section>
 <script>
-  var theDnis = "API-KEY";
+  var theDnis = "VOICE-CONNECTOR-ID";
+  var theWsUrl = "wss://127.0.0.1";
   var theAudio;
   var theWipDlgId = 0;
   const theWipDlgMp = new Map();
@@ -58,12 +59,13 @@
    * @return             생성한 WIP 다이얼로그 객체
    * @param  strAni      발신번호, 내 전화번호 또는 구분자
    * @param  strDnis     착신번호, 상대방 전화번호로 HelpNow 채널 연동시 발급 받은 번호
+   * @param  strWsUrl    시그널을 위한 웹소켓 접속 주소 정보
    * @param  oAudio      오디오 디바이스 객체
   */
-  function gMakeWipDlg(strAni, strDnis, oAudio)
+  function gMakeWipDlg(strAni, strDnis, strWsUrl, oAudio)
   {
     var id = theWipDlgId++;
-    var iWipDlg = new webip.MWipDialog(id, strAni, strDnis, oAudio);
+    var iWipDlg = new webip.MWipDialog(id, strAni, strDnis, strWsUrl, oAudio);
     theWipDlgMp.set(id, iWipDlg);
     console.log("Make WIP Dialog [id=" + id + ", current count=" + theWipDlgMp.size + "]");
     return iWipDlg;
@@ -206,7 +208,7 @@
     return iWipDlg.onIceCandidate(jCandidate);
   }
 
-  function gMakeCall(jMsg)
+  function gMakeCall()
   {
     console.log("gMakeCall");
     var strAni = document.getElementById('input_ani').value;
@@ -215,7 +217,7 @@
       window.alert('발신 번호를 입력하세요.');
       return;
     }
-    var iWipDlg = webip.MakeWipDlg(strAni, theDnis, theAudio);
+    var iWipDlg = webip.MakeWipDlg(strAni, theDnis, theWsUrl, theAudio);
     if(!iWipDlg)
     {
       window.alert('전화 연결 실패\nDialog 생성 실패');
