@@ -677,7 +677,7 @@ class MWipUaCstCalling extends MWipUaCState
   Reject(iDlg, jMsg)
   {
     console.log("MWipUaCstCalling::Reject");
-    iDlg.RecvReject();
+    iDlg.RecvReject(jMsg.reason);
     this.changeState(iDlg, theWipTerm);
     return true;
   }
@@ -713,7 +713,7 @@ class MWipUaCstProceeding extends MWipUaCState
   Reject(iDlg, jMsg)
   {
     console.log("MWipUaCstProceeding::Reject");
-    iDlg.RecvReject();
+    iDlg.RecvReject(jMsg.reason);
     this.changeState(iDlg, theWipTerm);
     return true;
   }
@@ -1220,9 +1220,10 @@ class MWipDialog
     console.log("MWipDialog::SendReject");
     return true;
   }
-  RecvReject()
+  RecvReject(jReason)
   {
     console.log("MWipDialog::RecvReject");
+    CbRejectedCall(this.mnIdx, jReason);
     return true;
   }
   SendCancel()
@@ -1344,6 +1345,10 @@ module.CbReleasedWebSocket = function(id)
 module.CbEstablishedCall = function(id)
 {
   console.log("module.CbEstablishedCall : " + id);
+}
+module.CbRejectedCall = function(id, jReason)
+{
+  console.log("module.CbRejectedCall : " + id + " [" + jReason.code + ": " + jReason.text + "]");
 }
 module.CbTerminatedCall = function(id)
 {

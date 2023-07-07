@@ -146,6 +146,16 @@
   }
 
   /*
+   * @brief              통화 거절 이벤트 콜백
+   * @param  id          MWipDialog의 ID, MWipDialog 생성시 첫번째 입력 파라메터
+   * @param  jReason     거절 사유, Json Object 타입 ( ex: {"code":"606","text":"Busy Here"} )
+  */
+  function gCbRejectedCall(id, jReason)
+  {
+    console.log("gCbRejectedCall : " + id + " [" + jReason.code + ": " + jReason.text + "]");
+  }
+
+  /*
    * @brief              통화 종료 이벤트 콜백
    * @param  id          MWipDialog의 ID, MWipDialog 생성시 첫번째 입력 파라메터
   */
@@ -243,6 +253,7 @@
   webip.CbInitializedWebSocket = gCbInitializedWebSocket;
   webip.CbReleasedWebSocket = gCbReleasedWebSocket;
   webip.CbEstablishedCall = gCbEstablishedCall;
+  webip.CbRejectedCall = gCbRejectedCall;
   webip.CbTerminatedCall = gCbTerminatedCall;
   webip.CbReleasedCall = gCbReleasedCall;
   webip.CbCreateWebRTCPeer = gCbCreateWebRTCPeer;
