@@ -1223,7 +1223,7 @@ class MWipDialog
   RecvReject(jReason)
   {
     console.log("MWipDialog::RecvReject");
-    CbRejectedCall(this.mnIdx, jReason);
+    module.CbRejectedCall(this.mnIdx, jReason);
     return true;
   }
   SendCancel()
