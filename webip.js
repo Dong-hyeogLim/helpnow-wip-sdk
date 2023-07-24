@@ -195,6 +195,7 @@ class MWsConnecting extends MWsStateMc
       iDlg.mtWsId = 0;
     }
     iDlg.mnTokenId = jMsg.token_id;
+    iDlg.SetTurn(jMsg);
     iDlg.mnKaInterval = jMsg.ka_interval;
     iDlg.mtKa = setInterval(  function()
                               {
@@ -400,6 +401,7 @@ class MWsReconnecting extends MWsStateMc
       iDlg.miWipStMc.WsClose(iDlg);
     }
     iDlg.mnTokenId = jMsg.token_id;
+    iDlg.SetTurn(jMsg);
     iDlg.mnKaInterval = jMsg.ka_interval;
     this.changeState(iDlg, theWsConD);
     iDlg.SendStoredMsg();
@@ -874,7 +876,7 @@ var theWipTerm = new MWipUastTerminated();
 // WIP Dialog Implement
 class MWipDialog
 {
-  constructor(nIdx, strAni, strDnis, strWsUrl, oAudioDvc)
+  constructor(nIdx, strAni, strDnis, strWsUrl, jTurnUser, oAudioDvc)
   {
     this.mnIdx = nIdx;
     this.mstrAni = strAni;
@@ -886,6 +888,8 @@ class MWipDialog
     this.mnTokenId = 0;
     this.mnKaInterval = 0;
     this.mtKa = 0;
+    this.mjTurnUser = jTurnUser;
+    this.maTurn = null;
     this.mtWsId = 0;
     this.mnWsToCnt = 0;
     this.mnNextToId = 0;
@@ -960,6 +964,24 @@ class MWipDialog
     };
     if(!this.miWsStMc.Processing(this, theWipCmd.WIP_SEMD_MSG, jMsg))
       this.mqSendMsg.Push(jMsg);
+  }
+
+  SetTurn(jMsg)
+  {
+    if(jMsg.hasOwnProperty("turn_uris") && Array.isArray(jMsg.turn_uris))
+    {
+      this.maTurn = [];
+      var i = 0;
+      jMsg.turn_uris.forEach((it) => {
+        this.maTurn[i++] =
+        {
+          urls: it,
+          username: this.mjTurnUser.username,
+          credential: this.mjTurnUser.credential,
+        };
+      });
+      console.log("Set Turn :" + this.maTurn);
+    }
   }
 
   SendStoredMsg()
@@ -1108,17 +1130,19 @@ class MWipDialog
       audio: true,
       video: false
     };
-    var jConfig =
-    {
-      iceServers: [{"urls":"turn:3.36.177.3:3478","username":"helpnow","credential":"opsbot12"}]
-      //iceServers: [{"urls":"stun:stun1.example.net"},{"urls":"stun:stun2.example.net"}]
-    };
     var jOptions =
     {
       onicecandidate: module.CbIceCandidate,
       mediaConstraints: jConstraints,
-      configuration: jConfig
     };
+    if(this.maTurn)
+    {
+      var jConfig =
+      {
+        iceServers: this.maTurn
+      }
+      jOptions.configuration = jConfig;
+    }
     this.miWebRTCPeer = new kurentoUtils.WebRtcPeer.WebRtcPeerSendrecv(jOptions, module.CbCreateWebRTCPeer, this.mnIdx);
     if(!this.miWebRTCPeer)
     {
@@ -1296,26 +1320,54 @@ class MWipDialog
   }
 };
 
-/*
+/* //////////////////////////////////////////////////////////////////////////
  * Multi-call 기능을 필요로 할경우 아래 함수를 사용자가 직접 재정의 하여 사용한다.
  * 재정의 방법은 index.html 파일을 참고한다.
 */
 var iWipDlg = null;
-module.MakeWipDlg = function(strAni, strDnis, strWsUrl, oAudio)
+
+/*
+ * @brief              WIP 다이얼로그 생성
+ * @return             생성한 WIP 다이얼로그 객체
+ * @param  strAni      발신번호, 내 전화번호 또는 구분자
+ * @param  strDnis     착신번호, 상대방 전화번호로 HelpNow 채널 연동시 발급 받은 번호
+ * @param  strWsUrl    시그널을 위한 웹소켓 접속 주소 정보
+ * @param  jTurnUser   TURN 사용을 위한 사용자 정보
+ * @param  oAudio      오디오 디바이스 객체
+*/
+module.MakeWipDlg = function(strAni, strDnis, strWsUrl, jTurnUser, oAudio)
 {
-  iWipDlg = new MWipDialog(0, strAni, strDnis, strWsUrl, oAudio);
+  iWipDlg = new MWipDialog(0, strAni, strDnis, strWsUrl, jTurnUser, oAudio);
   console.log("Make WIP Dialog!!");
   return iWipDlg;
 }
+
+/*
+ * @brief              WIP 다이얼로그 제거
+ * @param  id          MWipDialog의 ID, MWipDialog 생성시 첫번째 입력 파라메터
+*/
 module.RemoveWipDlg = function(id)
 {
   iWipDlg = null;
   console.log("Remove WIP Dialog!!");
 }
+
+/*
+ * @brief              WIP 다이얼로그 조회
+ * @return             조회한 WIP 다이얼로그 객체
+ * @param  id          MWipDialog의 ID, MWipDialog 생성시 첫번째 입력 파라메터
+*/
 module.GetWipDlg = function(id)
 {
   return iWipDlg;
 }
+
+/*
+ * @brief              예기치 않게 웹소켓이 끊어진 경우 이벤트 콜백
+ * @return             true: 재연결 시도, false: 세션 종료
+ * @param  id          MWipDialog의 ID, MWipDialog 생성시 첫번째 입력 파라메터
+ * @param  retry       재연결 시도 횟수
+*/
 module.CbUnforeseenWebSocketDisconnect = function(id, retry)
 {
   console.log("module.CbUnforeseenWebSocketDisconnect : " + id + ", retry=" + retry);
@@ -1323,6 +1375,13 @@ module.CbUnforeseenWebSocketDisconnect = function(id, retry)
     return true; // 재연결 시도
   return false; // 세션 종료
 }
+
+/*
+ * @brief              웹소켓 연결 초기화 이벤트 콜백
+ * @return             true: 성공, false: 실패
+ * @param  id          MWipDialog의 ID, MWipDialog 생성시 첫번째 입력 파라메터
+ * @param  retry       재연결로 인한 초기화 시도 횟수
+*/
 module.CbInitializedWebSocket = function(id, retry)
 {
   console.log("module.CbInitializedWebSocket : " + id + ", retry=" + retry);
@@ -1337,41 +1396,92 @@ module.CbInitializedWebSocket = function(id, retry)
   }
   return true;
 }
+
+/*
+ * @brief              웹소켓 해제 이벤트 콜백
+ * @param  id          MWipDialog의 ID, MWipDialog 생성시 첫번째 입력 파라메터
+*/
 module.CbReleasedWebSocket = function(id)
 {
   console.log("module.CbReleasedWebSocket : " + id);
   module.RemoveWipDlg(id);
 }
+
+/*
+ * @brief              통화 연결 이벤트 콜백
+ * @param  id          MWipDialog의 ID, MWipDialog 생성시 첫번째 입력 파라메터
+*/
 module.CbEstablishedCall = function(id)
 {
   console.log("module.CbEstablishedCall : " + id);
 }
+
+/*
+ * @brief              통화 거절 이벤트 콜백
+ * @param  id          MWipDialog의 ID, MWipDialog 생성시 첫번째 입력 파라메터
+ * @param  jReason     거절 사유, Json Object 타입 ( ex: {"code":"606","text":"Busy Here"} )
+*/
 module.CbRejectedCall = function(id, jReason)
 {
   console.log("module.CbRejectedCall : " + id + " [" + jReason.code + ": " + jReason.text + "]");
 }
+
+/*
+ * @brief              통화 종료 이벤트 콜백
+ * @param  id          MWipDialog의 ID, MWipDialog 생성시 첫번째 입력 파라메터
+*/
 module.CbTerminatedCall = function(id)
 {
   console.log("module.CbTerminatedCall : " + id);
 }
+
+/*
+ * @brief              통화 다이얼로그 해제 이벤트 콜백
+ * @param  id          MWipDialog의 ID, MWipDialog 생성시 첫번째 입력 파라메터
+*/
 module.CbReleasedCall = function(id)
 {
   console.log("module.CbReleasedCall : " + id);
   var iWipDlg = module.GetWipDlg(id);
   iWipDlg.WsClose(); // 통화가 완전히 종료되면 웹소켓 close
 }
+
+/*
+ * @brief              WebRTC-Peer 생성 이벤트 콜백
+ * @return             true: 성공, false: 실패
+ * @param  id          MWipDialog의 ID, MWipDialog 생성시 첫번째 입력 파라메터
+ * @param  error       생성 실패시 오류 정보
+ * @note               MWipDialog의 onCreateWebRTCPeer 함수를 호출해줘야 offer SDP를 생성 시도함. offer SDP가 생성되지 않는 경우 호를 발신하지 않음.
+*/
 module.CbCreateWebRTCPeer = function(id, error)
 {
   console.log("module.CbCreateWebRTCPeer : " + id);
   var iWipDlg = module.GetWipDlg(id);
   return iWipDlg.onCreateWebRTCPeer(error);
 }
+
+/*
+ * @brief              Offer SDP 생성 이벤트 콜백
+ * @return             true: 성공, false: 실패
+ * @param  id          MWipDialog의 ID, MWipDialog 생성시 첫번째 입력 파라메터
+ * @param  strError    생성 실패시 오류 문자열
+ * @param  strSdp      생성된 SDP 문자열
+ * @note               MWipDialog의 onOfferCall 함수를 호출해줘야 호를 발신시도 함.
+*/
 module.CbOfferCall = function(id, strError, strSdp)
 {
   console.log("module.CbOfferCall : " + id);
   var iWipDlg = module.GetWipDlg(id);
   return iWipDlg.onOfferCall(strError, strSdp);
 }
+
+/*
+ * @brief              ICE Candidate 수집 이벤트 콜백
+ * @return             true: 성공, false: 실패
+ * @param  id          MWipDialog의 ID, MWipDialog 생성시 첫번째 입력 파라메터
+ * @param  jCandidate  수집된 candidate 정보
+ * @note               MWipDialog의 onIceCandidate 함수를 호출해줘야 상대방 단말에 전달함.
+*/
 module.CbIceCandidate = function(id, jCandidate)
 {
   console.log("module.CbIceCandidate : " + id);
